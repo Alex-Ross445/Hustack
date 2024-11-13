@@ -23,6 +23,7 @@ class User {
     int totalPoints = 0;
     int errorCount = 0;
     Map<String, Integer> problemPoints = new HashMap<>();
+    boolean totalPointsCalculated = false;
 
     public User(String userId) {
         this.userId = userId;
@@ -33,12 +34,15 @@ class User {
             errorCount++;
         }
         problemPoints.put(submission.problemId, Math.max(problemPoints.getOrDefault(submission.problemId, 0), submission.points));
+        totalPointsCalculated = false;  // Mark that we need to recalculate total points
     }
 
-    public void calculateTotalPoints() {
-        for (int points : problemPoints.values()) {
-            totalPoints += points;
+    public int getTotalPoints() {
+        if (!totalPointsCalculated) {
+            totalPoints = problemPoints.values().stream().mapToInt(Integer::intValue).sum();
+            totalPointsCalculated = true; // Mark that total points have been calculated
         }
+        return totalPoints;
     }
 }
 
@@ -80,13 +84,12 @@ public class ContestSubmissionAnalyzer {
             } else if (query.startsWith("?total_point_of_user")) {
                 String userId = query.split(" ")[1];
                 User user = users.getOrDefault(userId, new User(userId));
-                user.calculateTotalPoints();
-                System.out.println(user.totalPoints);
+                System.out.println(user.getTotalPoints());
             } else if (query.startsWith("?number_submission_period")) {
                 String[] times = query.split(" ");
                 String fromTime = times[1];
                 String toTime = times[2];
-                int count = (int) submissions.stream()
+                long count = submissions.stream()
                         .filter(s -> s.timePoint.compareTo(fromTime) >= 0 && s.timePoint.compareTo(toTime) <= 0)
                         .count();
                 System.out.println(count);
