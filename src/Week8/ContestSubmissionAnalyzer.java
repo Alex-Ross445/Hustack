@@ -1,5 +1,8 @@
 package Week8;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.util.*;
 
 class Submission {
@@ -34,13 +37,13 @@ class User {
             errorCount++;
         }
         problemPoints.put(submission.problemId, Math.max(problemPoints.getOrDefault(submission.problemId, 0), submission.points));
-        totalPointsCalculated = false;  // Mark that we need to recalculate total points
+        totalPointsCalculated = false;
     }
 
     public int getTotalPoints() {
         if (!totalPointsCalculated) {
             totalPoints = problemPoints.values().stream().mapToInt(Integer::intValue).sum();
-            totalPointsCalculated = true; // Mark that total points have been calculated
+            totalPointsCalculated = true;
         }
         return totalPoints;
     }
@@ -73,6 +76,9 @@ public class ContestSubmissionAnalyzer {
     }
 
     public void processQueries(List<String> queries) {
+        // Sort submissions by timePoint for efficient range queries
+        submissions.sort(Comparator.comparing(s -> s.timePoint));
+
         for (String query : queries) {
             if (query.equals("?total_number_submissions")) {
                 System.out.println(totalSubmissions);
@@ -89,38 +95,62 @@ public class ContestSubmissionAnalyzer {
                 String[] times = query.split(" ");
                 String fromTime = times[1];
                 String toTime = times[2];
-                long count = submissions.stream()
-                        .filter(s -> s.timePoint.compareTo(fromTime) >= 0 && s.timePoint.compareTo(toTime) <= 0)
-                        .count();
+
+                // Use binary search to find the range
+                int startIndex = findFirstSubmissionIndex(fromTime);
+                int endIndex = findLastSubmissionIndex(toTime);
+
+                // Calculate the count based on indices
+                long count = Math.max(0, endIndex - startIndex + 1);
                 System.out.println(count);
             }
         }
     }
 
+    private int findFirstSubmissionIndex(String time) {
+        int left = 0, right = submissions.size() - 1;
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            if (submissions.get(mid).timePoint.compareTo(time) < 0) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+        return left; // This is the first submission >= time
+    }
+
+    private int findLastSubmissionIndex(String time) {
+        int left = 0, right = submissions.size() - 1;
+        while (left <= right) {
+            int mid = left + (right - left) / 2;
+            if (submissions.get(mid).timePoint.compareTo(time) <= 0) {
+                left = mid + 1;
+            } else {
+                right = mid - 1;
+            }
+        }
+        return right; // This is the last submission <= time
+    }
+
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
+        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         ContestSubmissionAnalyzer analyzer = new ContestSubmissionAnalyzer();
 
-        // Read submissions
-        while (true) {
-            String line = scanner.nextLine();
-            if (line.equals("#")) {
-                break;
+        try {
+            String line;
+            while (!(line = reader.readLine()).equals("#")) {
+                analyzer.processSubmission(line);
             }
-            analyzer.processSubmission(line);
-        }
 
-        // Read queries
-        List<String> queries = new ArrayList<>();
-        while (true) {
-            String line = scanner.nextLine();
-            if (line.equals("#")) {
-                break;
+            List<String> queries = new ArrayList<>();
+            while (!(line = reader.readLine()).equals("#")) {
+                queries.add(line);
             }
-            queries.add(line);
-        }
 
-        analyzer.processQueries(queries);
-        scanner.close();
+            analyzer.processQueries(queries);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }

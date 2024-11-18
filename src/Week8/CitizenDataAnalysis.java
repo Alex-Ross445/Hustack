@@ -1,118 +1,142 @@
 package Week8;
 
 import java.util.*;
-import java.io.*;
-
-class Citizen {
-    String code;
-    String dateOfBirth;
-    String fatherCode;
-    String motherCode;
-    char isAlive;
-    String regionCode;
-
-    public Citizen(String code, String dateOfBirth, String fatherCode, String motherCode, char isAlive, String regionCode) {
-        this.code = code;
-        this.dateOfBirth = dateOfBirth;
-        this.fatherCode = fatherCode;
-        this.motherCode = motherCode;
-        this.isAlive = isAlive;
-        this.regionCode = regionCode;
-    }
-}
+import java.text.SimpleDateFormat;
 
 public class CitizenDataAnalysis {
-    private List<Citizen> citizens = new ArrayList<>();
-    private Map<String, Integer> birthDateCount = new HashMap<>();
-    private Map<String, List<String>> parentChildMap = new HashMap<>();
 
-    public void loadData(BufferedReader reader) throws IOException {
-        String line;
-        while (!(line = reader.readLine()).equals("*")) {
-            String[] data = line.split(" ");
-            Citizen citizen = new Citizen(data[0], data[1], data[2], data[3], data[4].charAt(0), data[5]);
+    static class Citizen {
+        String code;
+        String dateOfBirth;
+        String fatherCode;
+        String motherCode;
+        char isAlive;
+        String regionCode;
+
+        Citizen(String code, String dateOfBirth, String fatherCode, String motherCode, char isAlive, String regionCode) {
+            this.code = code;
+            this.dateOfBirth = dateOfBirth;
+            this.fatherCode = fatherCode;
+            this.motherCode = motherCode;
+            this.isAlive = isAlive;
+            this.regionCode = regionCode;
+        }
+    }
+
+    public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+
+        // Read citizen data
+        List<Citizen> citizens = new ArrayList<>();
+        Map<String, Integer> birthCounts = new HashMap<>();
+
+        while (true) {
+            String line = scanner.nextLine().trim();
+            if (line.equals("*")) {
+                break;
+            }
+            String[] parts = line.split(" ");
+            Citizen citizen = new Citizen(parts[0], parts[1], parts[2], parts[3], parts[4].charAt(0), parts[5]);
             citizens.add(citizen);
-            birthDateCount.put(data[1], birthDateCount.getOrDefault(data[1], 0) + 1);
-            if (!data[2].equals("0000000")) {
-                parentChildMap.computeIfAbsent(data[2], k -> new ArrayList<>()).add(data[0]);
+            birthCounts.put(parts[1], birthCounts.getOrDefault(parts[1], 0) + 1);
+        }
+
+        // Read queries
+        List<String> queries = new ArrayList<>();
+        while (true) {
+            String line = scanner.nextLine().trim();
+            if (line.equals("***")) {
+                break;
             }
-            if (!data[3].equals("0000000")) {
-                parentChildMap.computeIfAbsent(data[3], k -> new ArrayList<>()).add(data[0]);
+            queries.add(line);
+        }
+
+        // Process queries
+        for (String query : queries) {
+            String[] parts = query.split(" ");
+            String command = parts[0];
+
+            switch (command) {
+                case "NUMBER_PEOPLE":
+                    System.out.println(citizens.size());
+                    break;
+                case "NUMBER_PEOPLE_BORN_AT":
+                    System.out.println(birthCounts.getOrDefault(parts[1], 0));
+                    break;
+                case "MOST_ALIVE_ANCESTOR":
+                    System.out.println(mostAliveAncestor(citizens, parts[1]));
+                    break;
+                case "NUMBER_PEOPLE_BORN_BETWEEN":
+                    System.out.println(numberPeopleBornBetween(birthCounts, parts[1], parts[2]));
+                    break;
+                case "MAX_UNRELATED_PEOPLE":
+                    System.out.println(maxUnrelatedPeople(citizens));
+                    break;
             }
         }
+
+        scanner.close();
     }
 
-    public int numberOfPeople() {
-        return citizens.size();
-    }
-
-    public int numberOfPeopleBornAt(String date) {
-        return birthDateCount.getOrDefault(date, 0);
-    }
-
-    public int mostAliveAncestor(String code) {
+    private static int mostAliveAncestor(List<Citizen> citizens, String code) {
         Set<String> visited = new HashSet<>();
-        return findMostAliveAncestor(code, visited, 0);
+        String currentCode = code;
+        int distance = 0;
+
+        while (currentCode != null && !currentCode.equals("0000000")) {
+            if (visited.contains(currentCode)) {
+                return -1; // Cycle detected
+            }
+            visited.add(currentCode);
+
+            Citizen person = findCitizen(citizens, currentCode);
+            if (person == null || person.isAlive == 'N') {
+                break;
+            }
+
+            currentCode = person.fatherCode; // Move to father
+            distance++;
+        }
+
+        return distance - 1 >= 0 ? distance - 1 : 0;
     }
 
-    private int findMostAliveAncestor(String code, Set<String> visited, int depth) {
+    private static Citizen findCitizen(List<Citizen> citizens, String code) {
         for (Citizen citizen : citizens) {
-            if (citizen.code.equals(code) && citizen.isAlive == 'Y') {
-                // Recur for ancestors
-                visited.add(code);
-                int maxDepth = depth;
-                if (!citizen.fatherCode.equals("0000000") && !visited.contains(citizen.fatherCode)) {
-                    maxDepth = Math.max(maxDepth, findMostAliveAncestor(citizen.fatherCode, visited, depth + 1));
-                }
-                if (!citizen.motherCode.equals("0000000") && !visited.contains(citizen.motherCode)) {
-                    maxDepth = Math.max(maxDepth, findMostAliveAncestor(citizen.motherCode, visited, depth + 1));
-                }
-                return maxDepth;
+            if (citizen.code.equals(code)) {
+                return citizen;
             }
         }
-        return -1; // Not found
+        return null;
     }
 
-    public int numberOfPeopleBornBetween(String fromDate, String toDate) {
+    private static int numberPeopleBornBetween(Map<String, Integer> birthCounts, String fromDate, String toDate) {
         int count = 0;
-        for (Citizen citizen : citizens) {
-            if (isBetween(citizen.dateOfBirth, fromDate, toDate)) {
-                count++;
+        for (String date : birthCounts.keySet()) {
+            if (date.compareTo(fromDate) >= 0 && date.compareTo(toDate) <= 0) {
+                count += birthCounts.get(date);
             }
         }
         return count;
     }
 
-    private boolean isBetween(String date, String fromDate, String toDate) {
-        return (date.compareTo(fromDate) >= 0) && (date.compareTo(toDate) <= 0);
-    }
+    private static int maxUnrelatedPeople(List<Citizen> citizens) {
+        Set<String> unrelated = new HashSet<>();
+        Set<String> related = new HashSet<>();
 
-    public void executeQueries(BufferedReader reader) throws IOException {
-        String line;
-        while (!(line = reader.readLine()).equals("***")) {
-            String[] queryParts = line.split(" ");
-            switch (queryParts[0]) {
-                case "NUMBER_PEOPLE":
-                    System.out.println(numberOfPeople());
-                    break;
-                case "NUMBER_PEOPLE_BORN_AT":
-                    System.out.println(numberOfPeopleBornAt(queryParts[1]));
-                    break;
-                case "MOST_ALIVE_ANCESTOR":
-                    System.out.println(mostAliveAncestor(queryParts[1]));
-                    break;
-                case "NUMBER_PEOPLE_BORN_BETWEEN":
-                    System.out.println(numberOfPeopleBornBetween(queryParts[1], queryParts[2]));
-                    break;
-                // Implement MAX_UNRELATED_PEOPLE as per requirement
+        for (Citizen citizen : citizens) {
+            unrelated.add(citizen.code);
+            if (!citizen.fatherCode.equals("0000000")) {
+                related.add(citizen.fatherCode);
+                related.add(citizen.code);
+            }
+            if (!citizen.motherCode.equals("0000000")) {
+                related.add(citizen.motherCode);
+                related.add(citizen.code);
             }
         }
-    }
 
-    public static void main(String[] args) throws IOException {
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        CitizenDataAnalysis analysis = new CitizenDataAnalysis();
-        analysis.loadData(reader);
-        analysis.executeQueries(reader);
+        unrelated.removeAll(related);
+        return unrelated.size();
     }
 }
